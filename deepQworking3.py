@@ -10,7 +10,7 @@ import bisect
 # HYPERPARMETERS
 H = 100
 H2 = 100
-batch_number = 1000
+batch_number = 500
 gamma = 0.995
 num_between_q_copies = 1000
 explore_decay = 0.9995
