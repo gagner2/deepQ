@@ -4,40 +4,38 @@ import numpy as np
 import tensorflow as tf
 import math
 import random
-import bisect
-#import nplot
 
 # HYPERPARMETERS
-H = 100
-H2 = 100
+H = 200
+H2 = 200
 batch_number = 500
-gamma = 0.995
-num_between_q_copies = 1000
+gamma = 0.99
+num_between_q_copies = 150
 explore_decay = 0.9995
-min_explore = 0.02
+min_explore = 0.01
 max_steps = 199    
-max_episodes = 2000
-memory_size = 10000
-learning_rate = 1e-3
+max_episodes = 1000
+memory_size = 100000
+learning_rate = 0.01
     
 
 if __name__ == '__main__':
 
     env = gym.make('CartPole-v0')
-    env.monitor.start('training_dir', force=True)
+    env.monitor.start('training', force=True)
 
     #Setup tensorflow    
     tf.reset_default_graph()
 
     #First Q Network
-    w1 = tf.Variable(tf.random_uniform([env.observation_space.shape[0],H], -.1, .1))
-    b1 = tf.Variable(tf.random_uniform([H], -.1, .1))
+    w1 = tf.Variable(tf.random_uniform([env.observation_space.shape[0],H], -1.0, 1.0))
+    b1 = tf.Variable(tf.random_uniform([H], -1.0, 1.0))
     
-    w2 = tf.Variable(tf.random_uniform([H, H2], -.1, .1))
-    b2 = tf.Variable(tf.random_uniform([H2], -.1, .1))
+    w2 = tf.Variable(tf.random_uniform([H, H2], -1.0, 1.0))
+    b2 = tf.Variable(tf.random_uniform([H2], -1.0, 1.0))
     
-    w3 = tf.Variable(tf.random_uniform([H2, env.action_space.n], -.1, .1))
-    b3 = tf.Variable(tf.random_uniform([env.action_space.n], -.1, .1))
+    w3 = tf.Variable(tf.random_uniform([H2, env.action_space.n], -1.0, 1.0))
+    b3 = tf.Variable(tf.random_uniform([env.action_space.n], -1.0, 1.0))
 
     #Second Q Network    
     w1_ = tf.Variable(tf.random_uniform([env.observation_space.shape[0],H], -1.0, 1.0))
@@ -46,8 +44,8 @@ if __name__ == '__main__':
     w2_ = tf.Variable(tf.random_uniform([H,H2], -1.0, 1.0))
     b2_ = tf.Variable(tf.random_uniform([H2], -1.0, 1.0))
     
-    w3_ = tf.Variable(tf.random_uniform([H2, env.action_space.n], -1, 1))
-    b3_ = tf.Variable(tf.random_uniform([env.action_space.n], -1, 1))
+    w3_ = tf.Variable(tf.random_uniform([H2, env.action_space.n], -1.0, 1.0))
+    b3_ = tf.Variable(tf.random_uniform([env.action_space.n], -1.0, 1.0))
     
     #Make assign functions for updating Q prime's weights
     w1_update= w1_.assign(w1)
@@ -82,26 +80,19 @@ if __name__ == '__main__':
     action_masks = tf.one_hot(action_used, env.action_space.n)
     filtered_Q = tf.reduce_sum(tf.mul(Q, action_masks), reduction_indices=1) 
     
-    #train Q
-    target_q = tf.placeholder(tf.float32, [None,]) # This holds all the rewards that are real/enhanced with Qprime
-    loss = tf.reduce_sum(tf.square(filtered_Q - target_q))
+    #Train Q
+    target_q = tf.placeholder(tf.float32, [None, ])
+    loss = tf.reduce_mean(tf.square(filtered_Q - target_q))
     train = tf.train.AdamOptimizer(learning_rate).minimize(loss) 
     
-    #Setting up the environment
+    #Set up the environment
     D = []
     explore = 1.0
-    
     rewardList = []
     past_actions = []
-    
     episode_number = 0
     episode_reward = 0
     reward_sum = 0
-    
-    xmax = 1
-    ymax = 1
-    xind = 1
-    yind = 3
 
     init = tf.initialize_all_variables()
   
@@ -118,13 +109,10 @@ if __name__ == '__main__':
             
             for step in xrange(max_steps):
                 ticks += 1
-                
-                xmax = max(xmax, state[xind])
-                ymax = max(ymax, state[yind])
 
                 if episode % 10 == 0:
                     q, qp = sess.run([Q,Q_], feed_dict={states_: np.array([state])})
-                    print "Q:{}, Q_ {}".format(q[0], qp[0])
+                    #print "Q:{}, Q_ {}".format(q[0], qp[0])
                     env.render()
 
                 if explore > random.random():
@@ -174,52 +162,11 @@ if __name__ == '__main__':
                 sess.run([train], feed_dict={states_: state_samples, target_q: y_, action_used: actions})
                 if ticks % num_between_q_copies == 0:
                     sess.run(all_assigns)
-                    
-            """if episode % 30 == 0:
-                        teststate = [0 for x in xrange(env.observation_space.shape[0])]
-                        X=[]
-                        Y=[]
-                        Z=[]
-                        ZR=[]
-                       
-                        xmin = -xmax
-                        xstep = xmax/100.0
-
-                        ymin = -ymax
-                        ystep = ymax/100.0
-
-                        test_state_list = []
-                        for x in nplot.drange(xmin,xmax, xstep):
-                            for y in nplot.drange(ymin,ymax,ystep):
-                                teststate[xind] = x
-                                teststate[yind] = y
-                                test_state_list.append([teststate[x] for x in xrange(len(teststate))])
-
-                        test_q_list = sess.run(Q, feed_dict={states_:test_state_list})
-                        zmax = max(map(max,test_q_list))
-                        ind = 0
-                        for x in nplot.drange(xmin,xmax, xstep):
-                            XX = []
-                            YY = []
-                            ZZ = []
-                            ZZR = []
-                            for y in nplot.drange(ymin,ymax,ystep):
-                                XX.append(x)
-                                YY.append(y)
-                                ZZ.append(test_q_list[ind][0])
-                                ZZR.append(test_q_list[ind][1])
-                                ind += 1
-                            X.append(XX)
-                            Y.append(YY)
-                            Z.append(ZZ)
-                            ZR.append(ZZR)
-                        nplot.plot(X,Y,Z, ZR, xmin,ymax,zmax)"""
 
 
-                
-            print 'Reward for episode %d is %d. Explore is %.4f' %(episode,reward_sum, explore)
-            
-            
-                
-                
+            if reward_sum >= 190:    
+                print 'Reward for episode %d is %d. Explore is %.4f' %(episode,reward_sum, explore)
+		    else:
+			    print 'Episode %d' %(episode)
+                         
 env.monitor.close()
