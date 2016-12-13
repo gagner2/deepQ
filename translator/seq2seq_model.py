@@ -1,4 +1,3 @@
-
 """Sequence-to-sequence model with an attention mechanism."""
 
 from __future__ import absolute_import
@@ -18,15 +17,9 @@ class Seq2SeqModel(object):
   """Sequence-to-sequence model with attention and for multiple buckets.
 
   This class implements a multi-layer recurrent neural network as encoder,
-  and an attention-based decoder. This is the same as the model described in
-  this paper: http://arxiv.org/abs/1412.7449 - please look there for details,
-  or into the seq2seq library for complete model implementation.
+  and an attention-based decoder.
   This class also allows to use GRU cells in addition to LSTM cells, and
-  sampled softmax to handle large output vocabulary size. A single-layer
-  version of this model, but with bi-directional encoder, was presented in
-    http://arxiv.org/abs/1409.0473
-  and sampled softmax is described in Section 3 of the following paper.
-    http://arxiv.org/abs/1412.2007
+  sampled softmax to handle large output vocabulary size.
   """
 
   def __init__(self,
@@ -162,7 +155,7 @@ class Seq2SeqModel(object):
     if not forward_only:
       self.gradient_norms = []
       self.updates = []
-      opt = tf.train.GradientDescentOptimizer(self.learning_rate)
+      opt = tf.train.AdamOptimizer(self.learning_rate)
       for b in xrange(len(buckets)):
         gradients = tf.gradients(self.losses[b], params)
         clipped_gradients, norm = tf.clip_by_global_norm(gradients,
